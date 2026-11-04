@@ -1,0 +1,221 @@
+<!DOCTYPE html>
+<html lang="th">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>HVAC Equation Solver – ปริมาณลม → ความเร็วลม</title>
+<style>
+:root{
+  --bg:#f3f5f4; --surface:#ffffff; --ink:#18242b; --muted:#5d6b73;
+  --line:#d5dcdf; --accent:#0b6e79; --soft:#e3f0f1; --warn:#8a5a00; --warnbg:#fbf1dc;
+}
+@media (prefers-color-scheme:dark){
+  :root{--bg:#10171b; --surface:#182228; --ink:#e7eef0; --muted:#97a6ad; --line:#2b3a42; --accent:#4cc0cc; --soft:#16343a; --warn:#f0c46a; --warnbg:#33290f;}
+}
+*{box-sizing:border-box}
+body{margin:0;background:var(--bg);color:var(--ink);font-family:"Noto Sans Thai","Sarabun",system-ui,-apple-system,"Segoe UI",sans-serif;line-height:1.55}
+main{max-width:760px;margin:0 auto;padding:24px 16px 48px}
+h1{font-size:1.5rem;margin:0 0 4px}
+.lead{color:var(--muted);margin:0 0 20px}
+section{background:var(--surface);border:1px solid var(--line);border-radius:10px;padding:18px;margin-bottom:16px}
+h2{font-size:1.05rem;margin:0 0 12px}
+.grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(230px,1fr));gap:12px}
+.pair{display:flex;gap:6px}
+.pair input{flex:1 1 0;min-width:0}
+.pair select{flex:0 0 96px;width:96px}
+label{display:block;font-size:.88rem;color:var(--muted);margin-bottom:4px}
+input,select{width:100%;font:inherit;color:var(--ink);background:var(--bg);border:1px solid var(--line);border-radius:6px;padding:9px 10px}
+input:focus-visible,select:focus-visible,button:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
+button{font:inherit;cursor:pointer;border:1px solid var(--line);background:transparent;color:var(--ink);border-radius:6px;padding:8px 14px;margin-top:14px}
+.unitpick{max-width:240px}
+.big{font-size:2.6rem;font-weight:700;color:var(--accent);line-height:1.1;font-variant-numeric:tabular-nums}
+.big small{font-size:1.1rem;font-weight:500;color:var(--muted);margin-left:6px}
+.sub{color:var(--muted);margin:2px 0 14px}
+table{width:100%;border-collapse:collapse;font-variant-numeric:tabular-nums}
+td{padding:7px 4px;border-top:1px solid var(--line)}
+td:last-child{text-align:right}
+tr.on td{background:var(--soft);font-weight:600}
+ol{margin:0;padding-left:20px}
+li{margin-bottom:6px;font-variant-numeric:tabular-nums}
+.note{background:var(--warnbg);color:var(--warn);border-radius:8px;padding:12px 14px;font-size:.92rem}
+.hint{color:var(--muted);margin:10px 0 0;min-height:1.2em}
+</style>
+</head>
+<body>
+<main>
+  <h1>HVAC Equation Solver: ปริมาณลม → ความเร็วลม</h1>
+  <p class="lead">กรอกขนาดช่องจ่ายลมและปริมาณลมจากแบบ แล้วเลือกหน่วยของปริมาณลมและหน่วยความเร็วลมที่ต้องการได้</p>
+
+  <section>
+    <h2>Input</h2>
+    <div class="grid">
+      <div>
+        <label for="w">ความกว้าง</label>
+        <div class="pair">
+          <input id="w" type="number" min="0" step="any" inputmode="decimal" placeholder="เช่น 300">
+          <select id="wunit" aria-label="หน่วยความกว้าง"></select>
+        </div>
+      </div>
+      <div>
+        <label for="h">ความสูง</label>
+        <div class="pair">
+          <input id="h" type="number" min="0" step="any" inputmode="decimal" placeholder="เช่น 300">
+          <select id="hunit" aria-label="หน่วยความสูง"></select>
+        </div>
+      </div>
+      <div>
+        <label for="q">ปริมาณลม</label>
+        <div class="pair">
+          <input id="q" type="number" min="0" step="any" inputmode="decimal" placeholder="เช่น 142">
+          <select id="qunit" aria-label="หน่วยปริมาณลม"></select>
+        </div>
+      </div>
+      <div><label for="m">เผื่อปริมาณลม (%)</label><input id="m" type="number" step="any" inputmode="decimal" placeholder="ไม่เผื่อ = เว้นว่าง"></div>
+    </div>
+    <button id="reset" type="button">ล้างค่า</button>
+    <p class="hint" id="hint" role="status"></p>
+  </section>
+
+  <section>
+    <h2>Results</h2>
+    <div class="unitpick">
+      <label for="unit">หน่วยความเร็วลม</label>
+      <select id="unit"></select>
+    </div>
+    <p class="sub" style="margin-top:14px">ปริมาณลมหลังเผื่อ: <b id="qadj">–</b></p>
+    <div class="sub" style="margin-bottom:0">ความเร็วลมเฉลี่ยจากพื้นที่กรอบเต็ม</div>
+    <div class="big" id="main">–</div>
+    <table id="all" style="margin-top:16px"></table>
+    <p class="sub" id="area" style="margin-top:12px"></p>
+  </section>
+
+  <section>
+    <h2>Equation Solver (แสดงการแทนค่า)</h2>
+    <p class="sub">ค่าคงที่: 1 L/s = 2.11888 CFM; 1 ft = 304.8 mm = 12 in; 1 m/s = 196.85 FPM</p>
+    <ol id="steps"><li>กรอกข้อมูลเพื่อดูการแทนค่า</li></ol>
+  </section>
+
+  <p class="note"><b>ข้อควรทราบ:</b> ผลลัพธ์นี้ใช้พื้นที่กรอบเต็มของ SAG ขนาดที่กรอก ไม่ใช่พื้นที่เปิดสุทธิของ grille และไม่ใช่ความเร็วภายในท่อส่งลม เว้นแต่ขนาดที่กรอกจะเป็นขนาดท่อจริง</p>
+</main>
+
+<script>
+(function(){
+  // หน่วยความเร็ว: แปลงจาก FPM
+  var UNITS = {
+    fpm: {label:"FPM (ft/min)", short:"FPM",  fromFpm:function(v){return v;}, d:1},
+    ms:  {label:"m/s",          short:"m/s",  fromFpm:function(v){return v/196.85;}, d:2},
+    fps: {label:"ft/s",         short:"ft/s", fromFpm:function(v){return v/60;}, d:2},
+    kmh: {label:"km/h",         short:"km/h", fromFpm:function(v){return v/196.85*3.6;}, d:2},
+    mph: {label:"mph",          short:"mph",  fromFpm:function(v){return v*60/5280;}, d:2},
+    kn:  {label:"knot (kn)",    short:"kn",   fromFpm:function(v){return v/196.85*1.943844;}, d:2}
+  };
+  // หน่วยปริมาณลม: toLs = ตัวคูณแปลงเป็น L/s
+  var FLOWS = {
+    ls:   {label:"L/s",   toLs:1},
+    lmin: {label:"L/min", toLs:1/60},
+    m3s:  {label:"m³/s",  toLs:1000},
+    m3min:{label:"m³/min",toLs:1000/60},
+    m3h:  {label:"m³/h",  toLs:1000/3600},
+    cfm:  {label:"CFM",   toLs:1/2.11888}
+  };
+  // หน่วยความยาว: toMm = ตัวคูณแปลงเป็น mm
+  var LENGTHS = {
+    mm:{label:"mm", toMm:1},
+    cm:{label:"cm", toMm:10},
+    m: {label:"m",  toMm:1000},
+    in:{label:"นิ้ว (in)", toMm:25.4},
+    ft:{label:"ft", toMm:304.8}
+  };
+  var $ = function(id){return document.getElementById(id);};
+  var unitSel = $("unit"), qSel = $("qunit"), wSel = $("wunit"), hSel = $("hunit");
+
+  function fill(sel, obj){
+    Object.keys(obj).forEach(function(k){
+      var o = document.createElement("option");
+      o.value = k; o.textContent = obj[k].label;
+      sel.appendChild(o);
+    });
+  }
+  fill(unitSel, UNITS); fill(qSel, FLOWS); fill(wSel, LENGTHS); fill(hSel, LENGTHS);
+
+  function load(key, obj, def){
+    var v = null;
+    try { v = localStorage.getItem(key); } catch(e){}
+    return (v && obj[v]) ? v : def;
+  }
+  function save(key, val){ try { localStorage.setItem(key, val); } catch(e){} }
+
+  unitSel.value = load("hvac-unit", UNITS, "fpm");
+  qSel.value = load("hvac-qunit", FLOWS, "ls");
+  wSel.value = load("hvac-wunit", LENGTHS, "mm");
+  hSel.value = load("hvac-hunit", LENGTHS, "mm");
+
+  function fmt(n,d){return Number(n).toLocaleString("en-US",{minimumFractionDigits:d,maximumFractionDigits:d});}
+
+  function clearResults(msg){
+    $("hint").textContent = msg;
+    $("qadj").textContent = "–";
+    $("main").textContent = "–";
+    $("all").innerHTML = "";
+    $("area").textContent = "";
+    $("steps").innerHTML = "<li>กรอกข้อมูลเพื่อดูการแทนค่า</li>";
+  }
+
+  function calc(){
+    var w = parseFloat($("w").value), h = parseFloat($("h").value),
+        q = parseFloat($("q").value), m = parseFloat($("m").value);
+    if (isNaN(m)) m = 0;
+
+    if (isNaN(w) || isNaN(h) || isNaN(q)) { clearResults("กรอกความกว้าง ความสูง และปริมาณลมเพื่อคำนวณ"); return; }
+    if (!(w>0) || !(h>0) || q<0) { clearResults("ความกว้างและความสูงต้องมากกว่า 0 และปริมาณลมต้องไม่ติดลบ"); return; }
+    $("hint").textContent = "";
+
+    var qu = FLOWS[qSel.value];
+    var qAdj = q*(1+m/100);            // หน่วยที่ผู้ใช้เลือก
+    var qLs  = qAdj*qu.toLs;           // L/s
+    var cfm  = qLs*2.11888;
+    var wu = LENGTHS[wSel.value], hu = LENGTHS[hSel.value];
+    var wMm = w*wu.toMm, hMm = h*hu.toMm;
+    var areaFt2 = (wMm/304.8)*(hMm/304.8);
+    var fpm = cfm/areaFt2;
+
+    var u = unitSel.value, U = UNITS[u];
+    $("qadj").textContent = fmt(qAdj,2)+" "+qu.label+(qSel.value==="ls" ? "" : " ("+fmt(qLs,2)+" L/s)");
+    $("main").innerHTML = fmt(U.fromFpm(fpm),U.d)+"<small>"+U.short+"</small>";
+
+    var rows = "";
+    Object.keys(UNITS).forEach(function(k){
+      rows += '<tr'+(k===u?' class="on"':'')+'><td>'+UNITS[k].label+'</td><td>'+fmt(UNITS[k].fromFpm(fpm),UNITS[k].d)+'</td></tr>';
+    });
+    rows += '<tr><td>ปริมาณลม (CFM)</td><td>'+fmt(cfm,2)+'</td></tr>';
+    $("all").innerHTML = rows;
+    $("area").textContent = "พื้นที่ = "+fmt(areaFt2,5)+" ft²";
+
+    var steps = [];
+    steps.push("ปริมาณลมหลังเผื่อ = "+fmt(q,2)+" × (1 + "+fmt(m,2)+"/100) = "+fmt(qAdj,2)+" "+qu.label);
+    if (qSel.value !== "ls") steps.push("แปลงเป็น L/s = "+fmt(qAdj,2)+" × "+fmt(qu.toLs,5)+" = "+fmt(qLs,2)+" L/s");
+    steps.push("แปลงเป็น CFM = "+fmt(qLs,2)+" × 2.11888 = "+fmt(cfm,2)+" CFM");
+    if (wSel.value !== "mm" || hSel.value !== "mm") {
+      steps.push("แปลงขนาดเป็น mm: กว้าง = "+fmt(w,2)+" "+wu.label+" × "+fmt(wu.toMm,1)+" = "+fmt(wMm,1)+" mm, สูง = "+fmt(h,2)+" "+hu.label+" × "+fmt(hu.toMm,1)+" = "+fmt(hMm,1)+" mm");
+    }
+    steps.push("พื้นที่ = ("+fmt(wMm,1)+"/304.8) × ("+fmt(hMm,1)+"/304.8) = "+fmt(areaFt2,5)+" ft²");
+    steps.push("ความเร็ว = "+fmt(cfm,2)+" / "+fmt(areaFt2,5)+" = "+fmt(fpm,1)+" FPM");
+    if (u !== "fpm") steps.push("แปลงเป็น "+U.short+" = "+fmt(U.fromFpm(fpm),U.d)+" "+U.short);
+    $("steps").innerHTML = steps.map(function(s){return "<li>"+s+"</li>";}).join("");
+  }
+
+  ["w","h","q","m"].forEach(function(id){$(id).addEventListener("input",calc);});
+  unitSel.addEventListener("change",function(){ save("hvac-unit",unitSel.value); calc(); });
+  qSel.addEventListener("change",function(){ save("hvac-qunit",qSel.value); calc(); });
+  wSel.addEventListener("change",function(){ save("hvac-wunit",wSel.value); calc(); });
+  hSel.addEventListener("change",function(){ save("hvac-hunit",hSel.value); calc(); });
+  $("reset").addEventListener("click",function(){
+    ["w","h","q","m"].forEach(function(id){$(id).value = "";});
+    calc();
+    $("w").focus();
+  });
+  calc();
+})();
+</script>
+</body>
+</html>
